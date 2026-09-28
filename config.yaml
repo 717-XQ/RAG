@@ -1,0 +1,78 @@
+# ============================================================
+# RAG智能文档问答系统 - 配置文件
+# 使用说明: 修改下方配置后保存，系统启动时自动加载
+# ============================================================
+
+# ---------- 模型配置 ----------
+model:
+  # Embedding模型（中文向量化，1024维）
+  embedding_model: "BAAI/bge-large-zh-v1.5"
+  # Reranker精排模型
+  reranker_model: "BAAI/bge-reranker-v2-m3"
+  # 大模型名称（DeepSeek模型：deepseek-chat / deepseek-reasoner）
+  llm_model: "deepseek-chat"
+  # 大模型API Key（已配置 - DeepSeek）
+  llm_api_key: "sk-58e54be6c7164aeea1434d4b43f78883"
+  # 大模型API Base URL（DeepSeek官方地址）
+  llm_base_url: "https://api.deepseek.com/v1"
+  # 生成温度（越低越事实性强）
+  llm_temperature: 0.1
+  # 最大生成token数
+  llm_max_tokens: 1024
+  # 推理设备: "cuda" 或 "cpu"
+  device: "cuda"
+
+# ---------- 检索配置 ----------
+retrieval:
+  # 向量检索召回数量
+  vector_top_k: 20
+  # BM25关键词检索召回数量
+  bm25_top_k: 20
+  # Reranker精排后保留数量
+  reranker_top_k: 5
+  # 向量检索权重（混合检索时）
+  vector_weight: 0.5
+  # BM25检索权重（混合检索时）
+  bm25_weight: 0.5
+
+# ---------- 文本切分配置 ----------
+chunking:
+  # 每个chunk的字符数
+  chunk_size: 500
+  # chunk之间的重叠字符数
+  chunk_overlap: 100
+  # 是否启用父子块策略
+  enable_parent_child: false
+  # 子块大小（用于检索）
+  child_chunk_size: 200
+  # 父块大小（用于生成）
+  parent_chunk_size: 1000
+
+# ---------- 向量数据库配置 ----------
+vector_store:
+  # 类型: "chroma"（开发）或 "milvus"（生产）
+  type: "chroma"
+  # Chroma持久化目录
+  persist_directory: "./chroma_db"
+  # 集合名称
+  collection_name: "rag_docs"
+  # Milvus配置（type=milvus时生效）
+  milvus_host: "localhost"
+  milvus_port: "19530"
+
+# ---------- 文档存储配置 ----------
+storage:
+  # 上传文档保存目录
+  upload_dir: "./uploaded_docs"
+  # 支持的文档格式
+  allowed_extensions: [".pdf", ".docx", ".txt", ".html", ".htm"]
+
+# ---------- 服务配置 ----------
+server:
+  host: "0.0.0.0"
+  port: 8000
+
+# ---------- 日志配置 ----------
+logging:
+  level: "INFO"
+  file: "./logs/rag.log"

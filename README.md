@@ -118,6 +118,15 @@ python main.py db-init --alembic  # 同时生成Alembic迁移
 
 > 未配置MySQL时系统会自动回退本地SQLite，便于快速开发。
 
+**SQLite 旧数据迁移到 MySQL**：若之前使用过 SQLite（`backend/data/rag.db`），希望把用户/会话/文档/消息/Token用量迁移到 MySQL：
+
+```bash
+cd RAG/backend
+python migrate_sqlite_to_mysql.py
+```
+
+脚本自动从 `config.yaml` 读取 MySQL 连接并建表，目标表已有相同主键时自动跳过，**可安全重复运行**（迁移 5 张表：users / documents / chat_sessions / chat_messages / token_usage）。
+
 ### 4.2 配置多Provider（DeepSeek / DashScope，技术栈2.1）
 
 优先通过环境变量注入 API Key（推荐，避免明文密钥入库）：
@@ -180,6 +189,8 @@ curl -X POST http://localhost:8000/auth/login \
 所有业务API（上传/问答/文档/统计/导出）需要携带 `Authorization: Bearer <access_token>`；
 访问Token 30分钟过期，前端Axios会自动用刷新Token续期。
 
+> **本地测试账号**：`test_user` / `test123456`（MySQL 初始化时已预置；也可自行注册新账号）。
+
 ### 7. 启动Vue3前端
 
 ```bash
@@ -206,6 +217,14 @@ npm run dev
 1. 打开 http://localhost:5173 自动跳转登录页
 2. 注册新账号或使用已注册账号登录
 3. 登录后进入聊天主界面，上传文档后开始问答
+
+### 7.2 后端冒烟测试（可选）
+
+```bash
+cd RAG/backend
+python smoke_test_api.py    # 快速API连通性测试
+python smoke_test_full.py   # 全流程测试（注册→登录→上传→问答→Token统计）
+```
 
 ### 8. 命令行问答（可选）
 
@@ -271,7 +290,8 @@ while (true) {
 RAG/
 ├── backend/                # 后端（对齐技术栈2.1，与 frontend-vue/ 平行区分）
 │   ├── config.py           # 配置管理模块（pydantic-settings，多Provider/数据库/认证/导出）
-│   ├── config.yaml         # 配置文件
+│   ├── config.yaml         # 配置文件（含敏感Key，已 .gitignore 排除）
+│   ├── config.yaml.example # 配置文件模板（占位值，可入库）
 │   ├── database.py         # SQLAlchemy 引擎与会话（MySQL优先/SQLite回退）
 │   ├── models.py           # ORM模型（用户/文档记录/会话/消息/Token用量）
 │   ├── auth.py             # JWT认证（python-jose + bcrypt）
@@ -286,6 +306,10 @@ RAG/
 │   ├── api.py              # FastAPI服务模块（REST + SSE + 认证 + 导出 + 统计）
 │   ├── evaluator.py        # RAGAS评估模块
 │   ├── main.py             # 命令行主入口（含 db-init 数据库初始化）
+│   ├── migrate_sqlite_to_mysql.py  # SQLite→MySQL 数据迁移（可重复运行）
+│   ├── smoke_test_api.py   # API冒烟测试（连通性）
+│   ├── smoke_test_full.py  # 全流程冒烟测试（注册→登录→上传→问答→统计）
+│   ├── frontend.py         # Gradio 轻量聊天界面（可选，替代/补充Vue前端）
 │   ├── requirements.txt    # 依赖清单
 │   ├── alembic.ini         # Alembic迁移配置
 │   ├── migrations/         # Alembic迁移目录（初始迁移 init_tables）

@@ -1,0 +1,71 @@
+# ============================================================
+# RAG智能文档问答系统 - 依赖清单
+# 说明：已按《技术栈规范》2.1 后端技术栈对齐补充
+# ============================================================
+
+# ---------- 后端框架 ----------
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+python-multipart==0.0.9
+sse-starlette==2.1.0
+
+# ---------- Agent编排（技术栈2.1：LangGraph + LangChain 0.2+） ----------
+langgraph>=0.2.0
+
+# ---------- 向量数据库 ----------
+chromadb==0.5.5
+pymilvus>=2.4.0    # 生产环境 Milvus（技术栈2.1：本地向量索引）
+
+# ---------- Embedding & Reranker 模型 ----------
+sentence-transformers==3.0.1
+FlagEmbedding==1.2.10
+transformers==4.44.0
+torch==2.4.0
+
+# ---------- 文档解析 ----------
+PyMuPDF==1.24.9
+python-docx==1.1.2
+unstructured==0.15.0
+beautifulsoup4==4.12.3
+lxml==5.3.0
+
+# ---------- 文本切分与检索框架 ----------
+langchain==0.2.16
+langchain-community==0.2.16
+langchain-text-splitters==0.2.4
+rank-bm25==0.2.2
+
+# ---------- LLM调用（多Provider自动降级，技术栈2.1） ----------
+openai==1.42.0
+# vllm==0.5.5  # 本地大模型部署，按需取消注释
+
+# ---------- 关系数据库（技术栈2.1：MySQL开发/PostgreSQL生产 + SQLAlchemy + Alembic） ----------
+SQLAlchemy>=2.0.0
+alembic>=1.13.0
+pymysql>=1.1.0     # MySQL驱动
+
+# ---------- 认证（技术栈2.1：python-jose + bcrypt JWT） ----------
+python-jose[cryptography]>=3.3.0
+bcrypt>=4.0.0
+
+# ---------- 文档导出（技术栈2.1：WeasyPrint PDF + python-docx Word） ----------
+weasyprint>=60.0
+
+# ---------- 评估 ----------
+ragas==0.1.14
+datasets==2.21.0
+
+# ---------- 前端 ----------
+gradio>=4.44.1
+
+# ---------- 工具库 ----------
+pydantic==2.8.2
+pydantic-settings==2.4.0
+pyyaml==6.0.2
+numpy==1.26.4
+pandas==2.2.2
+tqdm==4.66.5
+loguru==0.7.2
+python-dotenv==1.0.1
+aiofiles==23.2.1
+httpx==0.27.0

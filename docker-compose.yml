@@ -25,17 +25,20 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY:-your_api_key_here}
       # 可选：自定义API Base URL
       - LLM_BASE_URL=${LLM_BASE_URL:-https://api.openai.com/v1}
+      # 可选：DeepSeek / DashScope API Key（多Provider）
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY:-}
       # 容器内使用CPU（GPU需要额外配置nvidia-docker）
       - CUDA_VISIBLE_DEVICES=-1
     volumes:
-      # 持久化数据
-      - ./chroma_db:/app/chroma_db          # 向量数据库
-      - ./uploaded_docs:/app/uploaded_docs  # 上传的文档
-      - ./logs:/app/logs                    # 日志
-      - ./data:/app/data                    # 数据目录
-      - ./evaluations:/app/evaluations      # 评估结果
+      # 持久化数据（后端整合在 backend/ 目录下）
+      - ./backend/chroma_db:/app/backend/chroma_db          # 向量数据库
+      - ./backend/uploaded_docs:/app/backend/uploaded_docs  # 上传的文档
+      - ./backend/logs:/app/backend/logs                    # 日志
+      - ./backend/data:/app/backend/data                    # 数据目录
+      - ./backend/evaluations:/app/backend/evaluations      # 评估结果
       # 配置文件挂载（方便修改）
-      - ./config.yaml:/app/config.yaml
+      - ./backend/config.yaml:/app/backend/config.yaml
     healthcheck:
       test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
       interval: 30s

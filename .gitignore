@@ -31,6 +31,9 @@ ENV/
 .env.local
 .env.*.local
 
+# 本地敏感配置文件（含数据库密码 / API Key，不提交到git）
+config.yaml
+
 # 数据和持久化（不提交到git）
 chroma/
 chroma_db/
@@ -49,6 +52,8 @@ data/
 # 前端依赖
 frontend/node_modules/
 frontend/dist/
+frontend-vue/node_modules/
+frontend-vue/dist/
 
 # IDE
 .vscode/

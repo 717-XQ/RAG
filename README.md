@@ -5,12 +5,18 @@
 ## 功能特性
 
 - **多格式文档解析**：支持 PDF、DOCX、TXT、HTML 自动解析
-- **三级检索架构**：向量检索 + BM25关键词检索 + Reranker精排
+- **三级检索架构**：向量检索 + 关键词检索（BM25 / SQLite FTS5）+ Reranker精排
+- **SQLite FTS5 全文检索**：trigram 分词器，中文关键词检索（技术栈2.1）
 - **混合召回策略**：向量语义检索与关键词检索加权融合（min-max归一化）
+- **多Provider自动降级**：DeepSeek / DashScope(通义千问) / OpenAI 等按优先级自动降级（技术栈2.1）
+- **JWT认证**：python-jose + bcrypt，注册/登录/刷新Token，前端Token自动续期（技术栈2.1/2.2）
+- **关系数据库**：SQLAlchemy 2.0 + Alembic 迁移，MySQL（开发）/ PostgreSQL（生产）（技术栈2.1）
+- **报告导出**：WeasyPrint PDF 生成 / python-docx Word 导出（技术栈2.1）
+- **Token用量统计**：按天聚合，ECharts 图表展示（技术栈2.2）
 - **上下文优化**：针对Lost in the Middle问题的实验性上下文重排策略
 - **引用来源标注**：回答末尾自动标注 [来源:文件名-第X页]，可展开查看原文
 - **流式输出**：支持 SSE 流式输出，逐token显示，支持AbortController停止生成
-- **Vue3企业级前端**：左右分栏聊天界面、文档上传面板、知识库管理、引用来源展示、检索/生成耗时透明展示
+- **Vue3企业级前端**：Vue Router 路由、Pinia 状态、markdown-it 渲染、ECharts 图表（技术栈2.2）
 - **RESTful API**：完整的FastAPI接口，支持二次开发
 - **RAGAS评估**：自动化评估忠实度、相关性、召回率、精确率，100条标注测试集
 - **Docker部署**：一键容器化部署
@@ -20,14 +26,21 @@
 | 组件 | 技术 |
 |------|------|
 | 后端框架 | FastAPI + Uvicorn |
+| Agent编排 | LangGraph + LangChain 0.2+ |
 | 向量数据库 | Chroma（开发）/ Milvus（生产） |
+| 全文检索 | SQLite FTS5（trigram分词器，技术栈2.1） |
 | Embedding模型 | BAAI/bge-large-zh-v1.5（1024维） |
 | Reranker模型 | BAAI/bge-reranker-v2-m3 |
-| 大模型 | OpenAI GPT-3.5/4 或兼容API |
+| 大模型 | DeepSeek / DashScope / OpenAI 多Provider自动降级（OpenAI兼容API） |
 | 文档解析 | PyMuPDF、python-docx、BeautifulSoup |
 | 文本切分 | LangChain RecursiveCharacterTextSplitter |
-| 前端框架 | Vue3 + TypeScript + Vite + Element Plus + Pinia + Axios |
-| 前端通信 | REST API + SSE流式输出 |
+| 关系数据库 | MySQL（开发）/ PostgreSQL（生产）+ SQLAlchemy 2.0 + Alembic |
+| 认证 | python-jose（JWT）+ bcrypt |
+| 文档导出 | WeasyPrint（PDF）/ python-docx（Word） |
+| 前端框架 | Vue3 + TypeScript 5.4 + Vite + Element Plus + Pinia + Vue Router + Axios |
+| Markdown渲染 | markdown-it + highlight.js |
+| 图表 | ECharts 5.5+（Token用量统计） |
+| 前端通信 | REST API + SSE流式输出（Token自动刷新） |
 | 评估 | RAGAS |
 
 ## 系统架构
@@ -56,7 +69,7 @@
 ### 2. 安装后端依赖
 
 ```bash
-cd RAG
+cd RAG/backend        # 后端整合在 backend/ 目录（前端为 frontend-vue/）
 pip install -r requirements.txt
 ```
 
@@ -82,14 +95,54 @@ cp .env.example .env
 ### 4. 初始化项目
 
 ```bash
+cd RAG/backend
 python main.py init
 ```
 
-### 5. 构建知识库
+### 4.1 初始化关系数据库（MySQL / PostgreSQL，技术栈2.1）
 
-将文档放入 `data/docs` 目录，然后运行：
+本地已安装 MySQL 时，先修改 `config.yaml` 中的 `database.url` 为你的连接串：
+
+```yaml
+database:
+  url: "mysql+pymysql://用户名:密码@127.0.0.1:3306/rag_kb?charset=utf8mb4"
+```
+
+然后执行（自动建库+建表，也可生成Alembic迁移）：
 
 ```bash
+cd RAG/backend
+python main.py db-init            # 建库建表
+python main.py db-init --alembic  # 同时生成Alembic迁移
+```
+
+> 未配置MySQL时系统会自动回退本地SQLite，便于快速开发。
+
+### 4.2 配置多Provider（DeepSeek / DashScope，技术栈2.1）
+
+优先通过环境变量注入 API Key（推荐，避免明文密钥入库）：
+
+```bash
+# Windows PowerShell
+$env:DEEPSEEK_API_KEY="sk-..."
+$env:DASHSCOPE_API_KEY="sk-..."
+```
+
+或在 `.env` 文件中配置（`config.yaml` 的 `model.providers` 中留空 `api_key` 即可）：
+
+```
+DEEPSEEK_API_KEY=sk-...
+DASHSCOPE_API_KEY=sk-...
+```
+
+系统按 `priority` 顺序尝试各Provider，调用失败自动降级到下一个。
+
+### 5. 构建知识库
+
+将文档放入 `backend/data/docs` 目录，然后运行：
+
+```bash
+cd RAG/backend
 python main.py build --dir ./data/docs
 ```
 
@@ -102,12 +155,30 @@ python main.py add ./data/docs/example.pdf
 ### 6. 启动后端API服务
 
 ```bash
+cd RAG/backend
 python main.py serve
 # 或
 python api.py
 ```
 
-访问 http://localhost:8000/docs 查看API文档。
+访问 http://localhost:8000/swagger 查看API文档。
+
+### 6.1 登录获取Token
+
+```bash
+# 注册
+curl -X POST http://localhost:8000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","email":"admin@example.com","password":"your_password"}'
+
+# 登录（返回 access_token / refresh_token）
+curl -X POST http://localhost:8000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"your_password"}'
+```
+
+所有业务API（上传/问答/文档/统计/导出）需要携带 `Authorization: Bearer <access_token>`；
+访问Token 30分钟过期，前端Axios会自动用刷新Token续期。
 
 ### 7. 启动Vue3前端
 
@@ -119,16 +190,27 @@ npm run dev
 ```
 
 前端功能：
-- 左右分栏聊天界面
+- 左右分栏聊天界面（登录后使用）
 - 文档上传面板（拖拽+进度条）
 - 知识库文档列表管理
 - 引用来源展示（文件名+页码+相似度，可展开查看原文）
+- Markdown渲染（markdown-it + highlight.js 代码高亮）
 - SSE流式输出，支持停止生成
-- 检索/生成各阶段耗时透明展示
+- 检索/生成各阶段耗时与Token用量透明展示
+- 问答报告导出（PDF / DOCX 一键下载）
+- Token用量统计图表（ECharts，按天查看7/14/30天）
+- 登录/注册页面与Token自动刷新
+
+### 7.1 前端访问
+
+1. 打开 http://localhost:5173 自动跳转登录页
+2. 注册新账号或使用已注册账号登录
+3. 登录后进入聊天主界面，上传文档后开始问答
 
 ### 8. 命令行问答（可选）
 
 ```bash
+cd RAG/backend
 # 交互式问答
 python main.py chat
 
@@ -140,11 +222,19 @@ python main.py ask "什么是RAG技术？"
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
+| POST | `/auth/register` | 用户注册（返回Token） |
+| POST | `/auth/login` | 用户登录（返回Token） |
+| POST | `/auth/refresh` | 刷新Token |
+| GET | `/auth/me` | 当前用户信息 |
 | POST | `/api/upload` | 上传文档并加入知识库 |
 | POST | `/api/chat` | 非流式问答 |
 | POST | `/api/chat/stream` | 流式问答（SSE） |
 | GET | `/api/docs` | 列出知识库文档 |
 | DELETE | `/api/docs/{filename}` | 删除文档 |
+| POST | `/api/export/pdf` | 导出PDF问答报告（WeasyPrint） |
+| POST | `/api/export/docx` | 导出Word问答报告（python-docx） |
+| GET | `/api/stats/token-usage` | Token用量统计（ECharts数据源） |
+| GET | `/api/stats/sessions` | 会话列表 |
 | GET | `/api/health` | 健康检查 |
 
 ### 问答示例
@@ -179,39 +269,49 @@ while (true) {
 
 ```
 RAG/
-├── config.py              # 配置管理模块
-├── config.yaml            # 配置文件
-├── document_loader.py     # 文档加载与解析模块
-├── text_splitter.py       # 文本切分模块
-├── vector_store.py        # 向量存储模块
-├── retriever.py           # 检索引擎模块（混合召回+Reranker+上下文重排）
-├── rag_chain.py           # RAG问答链模块
-├── api.py                 # FastAPI服务模块（REST + SSE）
-├── frontend.py            # Gradio前端界面（备份版本，已升级为Vue3）
-├── evaluator.py           # RAGAS评估模块
-├── main.py                # 命令行主入口
-├── requirements.txt       # 依赖清单
-├── Dockerfile             # Docker镜像
-├── docker-compose.yml     # Docker Compose编排
-├── .env.example           # 环境变量模板
-├── frontend-vue/          # Vue3前端工程
+├── backend/                # 后端（对齐技术栈2.1，与 frontend-vue/ 平行区分）
+│   ├── config.py           # 配置管理模块（pydantic-settings，多Provider/数据库/认证/导出）
+│   ├── config.yaml         # 配置文件
+│   ├── database.py         # SQLAlchemy 引擎与会话（MySQL优先/SQLite回退）
+│   ├── models.py           # ORM模型（用户/文档记录/会话/消息/Token用量）
+│   ├── auth.py             # JWT认证（python-jose + bcrypt）
+│   ├── fts5.py             # SQLite FTS5 全文检索（trigram分词器）
+│   ├── llm_client.py       # 多Provider LLM客户端（自动降级）
+│   ├── export.py           # 报告导出（WeasyPrint PDF / python-docx Word）
+│   ├── document_loader.py  # 文档加载与解析模块
+│   ├── text_splitter.py    # 文本切分模块
+│   ├── vector_store.py     # 向量存储模块（Chroma / Milvus）
+│   ├── retriever.py        # 检索引擎模块（混合召回+Reranker+上下文重排）
+│   ├── rag_chain.py        # RAG问答链模块
+│   ├── api.py              # FastAPI服务模块（REST + SSE + 认证 + 导出 + 统计）
+│   ├── evaluator.py        # RAGAS评估模块
+│   ├── main.py             # 命令行主入口（含 db-init 数据库初始化）
+│   ├── requirements.txt    # 依赖清单
+│   ├── alembic.ini         # Alembic迁移配置
+│   ├── migrations/         # Alembic迁移目录（初始迁移 init_tables）
+│   ├── .env / .env.example # 环境变量
+│   ├── chroma_db/          # 向量数据库（自动生成）
+│   ├── uploaded_docs/      # 上传文档（自动生成）
+│   ├── data/               # 数据目录（docs示例/rag.db/fts5.db）
+│   ├── logs/               # 日志目录
+│   └── evaluations/        # 评估结果目录
+├── frontend-vue/           # Vue3前端工程（对齐技术栈2.2）
 │   ├── src/
-│   │   ├── api/rag.ts     # API封装（Axios + SSE）
-│   │   ├── types/index.ts # TypeScript类型定义
-│   │   ├── components/    # Vue组件
-│   │   │   ├── ChatMessage.vue   # 聊天消息+引用来源
-│   │   │   ├── SourceCard.vue    # 引用来源卡片
-│   │   │   ├── UploadPanel.vue   # 文档上传面板
-│   │   │   └── DocList.vue       # 知识库文档列表
-│   │   └── App.vue        # 主界面（左右分栏布局）
+│   │   ├── api/rag.ts      # API封装（Axios + Token自动刷新 + SSE）
+│   │   ├── types/index.ts  # TypeScript类型定义
+│   │   ├── stores/auth.ts  # Pinia认证状态
+│   │   ├── router/         # Vue Router路由（登录/主页）
+│   │   ├── views/          # 页面（LoginView / HomeView）
+│   │   ├── components/     # Vue组件（ChatMessage/MarkdownContent/TokenChart/SourceCard/UploadPanel/DocList）
+│   │   └── App.vue         # 应用入口（路由出口）
 │   ├── package.json
 │   ├── vite.config.ts
 │   └── tsconfig.json
-├── chroma_db/             # 向量数据库（自动生成）
-├── uploaded_docs/         # 上传文档（自动生成）
-├── data/docs/             # 示例文档目录
-├── logs/                  # 日志目录
-└── evaluations/           # 评估结果目录
+├── Dockerfile              # Docker镜像（构建 backend/）
+├── docker-compose.yml      # Docker Compose编排
+├── README.md               # 项目说明
+├── LICENSE                 # MIT许可证
+└── api_screenshot.png      # API截图
 ```
 
 ## 检索算法说明
@@ -289,7 +389,7 @@ chunking:
 # 设置环境变量
 export OPENAI_API_KEY="你的API Key"
 
-# 构建并启动（后端API + 向量数据库）
+# 构建并启动（后端API + 向量数据库，镜像内使用 backend/ 目录）
 docker-compose up -d
 
 # 前端单独构建
@@ -312,12 +412,41 @@ A: 首次运行会自动下载 BGE 模型（约1.3GB）和 Reranker模型，请�
 ### Q: 没有GPU可以运行吗？
 A: 可以。在 `config.yaml` 中将 `device` 改为 `cpu` 即可，只是推理速度会慢一些。
 
-### Q: 如何使用国内大模型？
-A: 修改 `config.yaml` 中的 `llm_base_url` 和 `llm_model` 为对应服务商的兼容接口地址和模型名。例如使用DeepSeek：
+### Q: 如何使用国内大模型 / 多Provider降级？
+A: 在 `config.yaml` 的 `model.providers` 中配置多个Provider（DeepSeek/DashScope/OpenAI），
+系统按 `priority` 顺序调用，失败自动降级到下一个。API Key 通过环境变量注入：
+
 ```yaml
-llm_base_url: "https://api.deepseek.com/v1"
-llm_model: "deepseek-chat"
+model:
+  providers:
+    - name: "deepseek"    # DEEPSEEK_API_KEY
+      model: "deepseek-chat"
+      base_url: "https://api.deepseek.com/v1"
+      priority: 1
+    - name: "dashscope"   # DASHSCOPE_API_KEY（阿里云百炼通义千问）
+      model: "qwen-plus"
+      base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      priority: 2
 ```
+
+### Q: 如何切换到 Milvus 向量库（生产环境）？
+A: 修改 `config.yaml` 的 `vector_store.type` 为 `milvus` 并配置 Milvus 地址，系统已内置 pymilvus 支持：
+```yaml
+vector_store:
+  type: "milvus"          # chroma（开发）/ milvus（生产）
+  milvus_host: "localhost"
+  milvus_port: "19530"
+```
+
+### Q: PDF导出报错 `cannot load library 'libgobject-2.0-0'`？
+A: WeasyPrint 在 Windows 上需要 GTK3 运行时。请安装
+[GTK3 Runtime for Windows](https://github.com/nicedash/gtk3-runtime/releases)（或
+[GTK-for-Windows-Runtime-Environment-Installer](https://github.com/tschoonj/GTK-for-Windows-Runtime-Environment-Installer)），
+安装后重启终端即可。Word（DOCX）导出无需额外依赖。
+
+### Q: 数据库连接失败？
+A: 检查 `config.yaml` 的 `database.url` 是否正确；系统默认在连接失败时回退本地SQLite。
+生产环境建议配置 MySQL/PostgreSQL 并使用 `python main.py db-init` 初始化。
 
 ### Q: 支持哪些文档格式？
 A: 目前支持 PDF、DOCX、TXT、HTML。旧版 .doc 格式支持有限，建议转为 .docx。
@@ -325,8 +454,9 @@ A: 目前支持 PDF、DOCX、TXT、HTML。旧版 .doc 格式支持有限，建�
 ### Q: 前端如何停止生成？
 A: 前端使用AbortController中断fetch请求，点击"停止生成"按钮即可中断SSE流。后端收到连接断开后会清理生成任务。
 
-### Q: 如何切换混合检索权重？
-A: 修改 `config.yaml` 中的 `vector_weight` 和 `bm25_weight`（两者之和应为1）。建议在测试集上做消融实验选择最优权重。
+### Q: 如何切换混合检索权重 / 关键词检索实现？
+A: 修改 `config.yaml` 中的 `vector_weight` 和 `bm25_weight`（两者之和应为1）；
+关键词检索实现通过 `retrieval.keyword_retriever` 切换：`fts5`（SQLite全文索引，默认）或 `bm25`（内存索引）。
 
 ## 许可证
 

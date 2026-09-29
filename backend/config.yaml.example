@@ -1,0 +1,105 @@
+# ============================================================
+# RAG智能文档问答系统 - 配置模板（config.yaml.example）
+# 使用方法：复制本文件为 config.yaml，填入你自己的密码/密钥后使用
+# 注意：config.yaml 含敏感信息，已被 .gitignore 排除，不会提交到 git
+# ============================================================
+
+# ---------- 模型配置 ----------
+model:
+  # Embedding模型（中文向量化，1024维）
+  embedding_model: "BAAI/bge-large-zh-v1.5"
+  # Reranker精排模型
+  reranker_model: "BAAI/bge-reranker-v2-m3"
+  # 默认LLM模型名（兼容旧配置，多Provider时由 providers 决定）
+  llm_model: "deepseek-chat"
+  # 默认LLM API Key（优先读环境变量，建议不写死在此处）
+  llm_api_key: ""
+  # 默认LLM Base URL
+  llm_base_url: "https://api.deepseek.com/v1"
+  # 生成温度（越低越事实性强）
+  llm_temperature: 0.1
+  # 最大生成token数
+  llm_max_tokens: 1024
+  # 推理设备: "cuda" 或 "cpu"
+  device: "cuda"
+  # 多Provider自动降级（技术栈2.1：DashScope / 多Provider）
+  # 按 priority 顺序尝试，失败自动降级到下一个；留空api_key的Provider会被跳过
+  providers:
+    - name: "deepseek"
+      model: "deepseek-chat"
+      api_key: ""          # 建议用环境变量 DEEPSEEK_API_KEY / OPENAI_API_KEY
+      base_url: "https://api.deepseek.com/v1"
+      priority: 1
+    - name: "dashscope"
+      model: "qwen-plus"
+      api_key: ""          # 建议用环境变量 DASHSCOPE_API_KEY
+      base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      priority: 2
+
+# ---------- 检索配置 ----------
+retrieval:
+  vector_top_k: 20
+  bm25_top_k: 20
+  keyword_retriever: "fts5"
+  reranker_top_k: 5
+  vector_weight: 0.5
+  bm25_weight: 0.5
+
+# ---------- FTS5 全文检索（技术栈2.1：SQLite FTS5 中文关键词检索） ----------
+fts5:
+  db_path: "./data/fts5.db"
+  tokenizer: "trigram"
+
+# ---------- 文本切分配置 ----------
+chunking:
+  chunk_size: 500
+  chunk_overlap: 100
+  enable_parent_child: false
+  child_chunk_size: 200
+  parent_chunk_size: 1000
+
+# ---------- 向量数据库配置 ----------
+vector_store:
+  type: "chroma"
+  persist_directory: "./chroma_db"
+  collection_name: "rag_docs"
+  milvus_host: "localhost"
+  milvus_port: "19530"
+
+# ---------- 关系数据库（技术栈2.1：MySQL开发/PostgreSQL生产 + SQLAlchemy + Alembic） ----------
+database:
+  # MySQL连接串：请将 YOUR_MYSQL_PASSWORD 替换为你自己的密码，
+  # 并执行 python main.py db-init 建库建表
+  url: "mysql+pymysql://root:YOUR_MYSQL_PASSWORD@127.0.0.1:3306/rag_kb?charset=utf8mb4"
+  echo: false
+  # 连接失败时是否回退SQLite（便于本地快速开发）
+  fallback_sqlite: true
+  sqlite_path: "./data/rag.db"
+
+# ---------- 认证（技术栈2.1：python-jose + bcrypt JWT） ----------
+auth:
+  enabled: true
+  jwt_secret: "rag-system-change-me-please-0123456789"
+  jwt_algorithm: "HS256"
+  access_token_expire_minutes: 30
+  refresh_token_expire_days: 7
+
+# ---------- 文档导出（技术栈2.1：WeasyPrint PDF / python-docx Word） ----------
+export:
+  report_title: "RAG 智能问答报告"
+  pdf_css_font: "Microsoft YaHei"
+
+# ---------- 文档存储配置 ----------
+storage:
+  upload_dir: "./uploaded_docs"
+  allowed_extensions: [".pdf", ".docx", ".txt", ".html", ".htm"]
+
+# ---------- 服务配置 ----------
+server:
+  host: "0.0.0.0"
+  port: 8000
+
+# ---------- 日志配置 ----------
+logging:
+  level: "INFO"
+  file: "./logs/rag.log"

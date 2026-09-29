@@ -4,8 +4,8 @@
 # 基础镜像：Python 3.11 slim（轻量级）
 FROM python:3.11-slim
 
-# 设置工作目录
-WORKDIR /app
+# 设置工作目录（后端整合在 backend/ 目录下）
+WORKDIR /app/backend
 
 # 设置环境变量
 ENV PYTHONUNBUFFERED=1 \
@@ -26,7 +26,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # 先复制依赖文件（利用Docker缓存）
-COPY requirements.txt .
+COPY backend/requirements.txt .
 
 # 安装Python依赖
 # 注意：torch较大，单独安装以利用缓存
@@ -34,11 +34,11 @@ RUN pip install --upgrade pip && \
     pip install torch --index-url https://download.pytorch.org/whl/cpu && \
     pip install -r requirements.txt
 
-# 复制项目代码
-COPY . .
+# 复制后端代码
+COPY backend/ .
 
 # 创建必要目录
-RUN mkdir -p /app/uploaded_docs /app/chroma_db /app/logs /app/evaluations /app/data/docs
+RUN mkdir -p /app/backend/uploaded_docs /app/backend/chroma_db /app/backend/logs /app/backend/evaluations /app/backend/data/docs
 
 # 暴露端口
 # 8000: FastAPI API
